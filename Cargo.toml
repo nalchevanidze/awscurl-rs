@@ -1,0 +1,13 @@
+[package]
+name = "awscurl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sha256 = "1.1.2"
+url = "2.3.1"
+ring = "0.16.20"
+ureq = "2.6.2"
+chrono ="0.4.24"
+hex = "0.4.3"
+tungstenite = {version = "0.18.0", features = ["rustls-tls-webpki-roots"]}
