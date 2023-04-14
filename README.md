@@ -1,7 +1,7 @@
 # AWSCurl
 
 Provides an _https_ interface for AWS Services. 
-is inspired by [awscurl cli](https://github.com/okigan/awscurl), 
+is inspired by [awscurl](https://github.com/okigan/awscurl), 
 but does not provide a _CLI_, only an API for similar functions.
 
 # Example
