@@ -2,6 +2,11 @@
 name = "awscurl"
 version = "0.1.0"
 edition = "2021"
+authors = ["Daviti Nalchevanidze <d.nalchevanidze@gmail.com>"]
+description = "https/mqtt API for AWS"
+keywords = ["aws", "mqtt", "http"]
+license = "MIT"
+repository = "https://github.com/nalchevanidze/awscurl"
 
 [dependencies]
 sha256 = "1.1.2"
