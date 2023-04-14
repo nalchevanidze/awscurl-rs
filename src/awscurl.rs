@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     signature::{mqtt_over_websockets_request, sign_headers, V4Options},
-    types::{AWSIotError, AWSIotResult, AWSProfile, Body, Method},
+    types::{AWSCurlError, AWSIotResult, AWSProfile, Body, Method},
 };
 use tungstenite::handshake::client::Request;
 
@@ -24,7 +24,7 @@ impl AWSCurl {
             Method::GET => ureq::get(&url),
         };
 
-        let parsed_url = &url.parse().map_err(AWSIotError::new)?;
+        let parsed_url = &url.parse().map_err(AWSCurlError::new)?;
 
         let mut headers = HashMap::from([
             ("accept".to_string(), "application/xml".to_string()),
@@ -52,13 +52,13 @@ impl AWSCurl {
         };
 
         match response {
-            Ok(x) => x.into_string().map_err(AWSIotError::new),
-            Err(ureq::Error::Status(code, res)) => Err(AWSIotError::new(format!(
+            Ok(x) => x.into_string().map_err(AWSCurlError::new),
+            Err(ureq::Error::Status(code, res)) => Err(AWSCurlError::new(format!(
                 "{}: {}",
                 code.to_string(),
                 res.into_string().unwrap_or_default()
             ))),
-            Err(err) => Err(AWSIotError::new(err.to_string())),
+            Err(err) => Err(AWSCurlError::new(err.to_string())),
         }
     }
 

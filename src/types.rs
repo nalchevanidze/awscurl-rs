@@ -47,7 +47,7 @@ pub struct AWSProfile {
 }
 
 fn env_var(key: &str) -> AWSIotResult<String> {
-    env::var(key).map_err(|_| AWSIotError::new(&format!("cant found env variable: {}!", key)))
+    env::var(key).map_err(|_| AWSCurlError::new(&format!("cant found env variable: {}!", key)))
 }
 
 impl AWSProfile {
@@ -66,22 +66,22 @@ impl AWSProfile {
     }
 }
 
-pub type AWSIotResult<T> = Result<T, AWSIotError>;
+pub type AWSIotResult<T> = Result<T, AWSCurlError>;
 
 #[derive(Debug)]
-pub struct AWSIotError {
+pub struct AWSCurlError {
     pub message: String,
 }
 
-impl AWSIotError {
+impl AWSCurlError {
     pub fn new<T: Display>(message: T) -> Self {
-        AWSIotError {
+        AWSCurlError {
             message: message.to_string(),
         }
     }
 }
 
-impl Display for AWSIotError {
+impl Display for AWSCurlError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.message)
     }
