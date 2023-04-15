@@ -91,7 +91,7 @@ impl AWSCurl {
         _value: Vec<u8>,
     ) -> AWSIotResult<()> {
         let request = self.mqtt_over_ws_request(&endpoint);
-        let (mut socket, response) = connect(request)
+        let (mut _socket, _response) = connect(request)
             .map_err(|x| AWSCurlError::new(format!("{:?}\n{}", x, x.to_string())))?;
         /*
         TODO: implement sending message
