@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    signature::{mqtt_over_websockets_request, sign_headers, V4Options},
+    signature::{mqtt_over_websockets_request, sign_headers, V4SigOptions},
     types::{AWSCurlError, AWSIotResult, AWSProfile, Body, Method},
 };
 use tungstenite::handshake::client::Request;
@@ -33,7 +33,7 @@ impl AWSCurl {
 
         sign_headers(
             &mut headers,
-            V4Options {
+            V4SigOptions {
                 method,
                 service,
                 url: parsed_url,

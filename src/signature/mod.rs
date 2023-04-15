@@ -44,14 +44,14 @@ fn calc_signature(
     hex::encode(sign(signing_key.as_ref(), &msg).as_ref())
 }
 
-pub struct V4Options<'a> {
+pub struct V4SigOptions<'a> {
     pub method: &'a Method,
     pub service: &'a str,
     pub url: &'a Url,
     pub profile: &'a AWSProfile,
 }
 
-struct V4SigOptions<'a> {
+struct V4SigBuilder<'a> {
     profile: &'a AWSProfile,
     uri: &'a str,
     query: Vec<(String, String)>,
@@ -61,7 +61,7 @@ struct V4SigOptions<'a> {
     service: &'a str,
 }
 
-impl<'a> V4SigOptions<'a> {
+impl<'a> V4SigBuilder<'a> {
     fn scope(&self) -> String {
         format!(
             "{}/{}/{}/aws4_request",
@@ -157,31 +157,31 @@ impl<'a> V4SigOptions<'a> {
 
 pub fn sign_headers(
     headers: &mut Headers,
-    V4Options {
+    V4SigOptions {
         method,
         service,
         url,
         profile,
-    }: V4Options,
+    }: V4SigOptions,
 ) {
     let timestamp = &Timestamp::new();
 
-    headers.insert(X_AMZ_DATE.to_string(), timestamp.x_amz_date());
     headers.insert("host".to_string(), url.host_str().unwrap().to_owned());
 
-    let v4 = V4SigOptions {
+    let v4 = V4SigBuilder {
         uri: url.path().into(),
         query: url
             .query_pairs()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect(),
         method,
-        headers,
+        headers: &headers.clone(),
         timestamp,
         service,
         profile,
     };
 
+    headers.insert(X_AMZ_DATE.to_string(), timestamp.x_amz_date());
     headers.insert(AUTHORIZATION.to_string(), v4.authorization());
     headers.insert(
         X_AMZ_SECURITY_TOKEN.to_string(),
@@ -193,7 +193,7 @@ pub fn sign_headers(
 pub fn mqtt_over_websockets_request(profile: &AWSProfile, endpoint: &str) -> Request {
     let host = format!("{}:443", endpoint);
 
-    let mut v4 = V4SigOptions {
+    let mut v4 = V4SigBuilder {
         uri: "/mqtt",
         query: Vec::new(),
         method: &Method::GET,
