@@ -51,23 +51,42 @@ pub struct V4SigOptions<'a> {
     pub profile: &'a AWSProfile,
 }
 
+impl<'a> V4SigOptions<'a> {
+    fn host(&self) -> String {
+        self.url.host_str().unwrap().to_owned()
+    }
+
+    fn uri(&self) -> String {
+        self.url.path().into()
+    }
+}
+
 struct V4SigBuilder<'a> {
-    profile: &'a AWSProfile,
-    uri: &'a str,
+    options: &'a V4SigOptions<'a>,
     query: Vec<(String, String)>,
-    method: &'a Method,
-    headers: &'a Headers,
-    timestamp: &'a Timestamp,
-    service: &'a str,
+    headers: Headers,
+    timestamp: Timestamp,
 }
 
 impl<'a> V4SigBuilder<'a> {
+    fn new(options: &'a V4SigOptions<'a>, headers: &Headers) -> V4SigBuilder<'a> {
+        V4SigBuilder {
+            options,
+            query: options
+                .url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            headers: headers.clone(),
+            timestamp: Timestamp::new(),
+        }
+    }
     fn scope(&self) -> String {
         format!(
             "{}/{}/{}/aws4_request",
             self.timestamp.date_stamp(),
-            self.profile.region,
-            self.service
+            self.options.profile.region,
+            self.options.service
         )
     }
 
@@ -110,12 +129,12 @@ impl<'a> V4SigBuilder<'a> {
     fn signature(&self) -> String {
         let canonical_request = format!(
             "{method}\n{uri}\n{query}\n{headers}\n\n{signed}\n{sha256}",
-            method = self.method,
-            uri = self.uri,
+            method = self.options.method,
+            uri = self.options.uri(),
             query = &self.canonical_query(),
             headers = &self.canonical_headers(),
             signed = self.signed_headers(),
-            sha256 = &self.method.hash_body(),
+            sha256 = &self.options.method.hash_body(),
         );
 
         let string_to_sign = format!(
@@ -128,9 +147,9 @@ impl<'a> V4SigBuilder<'a> {
 
         calc_signature(
             &self.timestamp.date_stamp(),
-            &self.profile.secret_key,
-            &self.profile.region,
-            self.service,
+            &self.options.profile.secret_key,
+            &self.options.profile.region,
+            self.options.service,
             &string_to_sign,
         )
     }
@@ -139,7 +158,7 @@ impl<'a> V4SigBuilder<'a> {
         format!(
             "{alg} Credential={key}/{scope}, SignedHeaders={signed_headers},Signature={signature}",
             alg = AWS4_HMAC_SHA256,
-            key = self.profile.access_key,
+            key = self.options.profile.access_key,
             scope = self.scope(),
             signed_headers = self.signed_headers(),
             signature = self.signature()
@@ -147,7 +166,7 @@ impl<'a> V4SigBuilder<'a> {
     }
 
     fn credential(&self) -> String {
-        format!("{}/{}", self.profile.access_key, self.scope())
+        format!("{}/{}", self.options.profile.access_key, self.scope())
     }
 
     fn add_query(&mut self, k: &str, v: String) {
@@ -155,53 +174,36 @@ impl<'a> V4SigBuilder<'a> {
     }
 }
 
-pub fn sign_headers(
-    headers: &mut Headers,
-    V4SigOptions {
-        method,
-        service,
-        url,
-        profile,
-    }: V4SigOptions,
-) {
-    let timestamp = &Timestamp::new();
+pub fn sign_headers(headers: &mut Headers, options: V4SigOptions) {
+    headers.insert(HOST.to_string(), options.host());
 
-    headers.insert(HOST.to_string(), url.host_str().unwrap().to_owned());
+    let v4 = V4SigBuilder::new(&options, &headers.clone());
 
-    let v4 = V4SigBuilder {
-        uri: url.path().into(),
-        query: url
-            .query_pairs()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect(),
-        method,
-        headers: &headers.clone(),
-        timestamp,
-        service,
-        profile,
-    };
-
-    headers.insert(X_AMZ_DATE.to_string(), timestamp.x_amz_date());
+    headers.insert(X_AMZ_DATE.to_string(), v4.timestamp.x_amz_date());
     headers.insert(AUTHORIZATION.to_string(), v4.authorization());
     headers.insert(
         X_AMZ_SECURITY_TOKEN.to_string(),
-        profile.session_token.to_string(),
+        options.profile.session_token.to_string(),
     );
-    headers.insert(X_AMZ_CONTENT_SHA256.to_string(), method.hash_body());
+    headers.insert(
+        X_AMZ_CONTENT_SHA256.to_string(),
+        v4.options.method.hash_body(),
+    );
 }
 
 pub fn mqtt_over_websockets_request(profile: &AWSProfile, endpoint: &str) -> Request {
-    let host = format!("{}:443", endpoint);
+    let url = format!("wss://{}/mqtt", endpoint);
 
-    let mut v4 = V4SigBuilder {
-        uri: "/mqtt",
-        query: Vec::new(),
+    let options = V4SigOptions {
         method: &Method::GET,
-        headers: &HashMap::from([("host".to_string(), host.to_string())]),
-        timestamp: &Timestamp::new(),
         service: "iotdata",
+        url: &url.parse().unwrap(),
         profile,
     };
+
+    let headers = HashMap::from([(HOST.to_string(), options.host())]);
+    
+    let mut v4 = V4SigBuilder::new(&options, &headers);
 
     v4.add_query(X_AMZ_ALGORITHM, AWS4_HMAC_SHA256.to_string());
     v4.add_query(X_AMZ_DATE, v4.timestamp.x_amz_date());
@@ -210,13 +212,13 @@ pub fn mqtt_over_websockets_request(profile: &AWSProfile, endpoint: &str) -> Req
     v4.add_query(X_AMZ_SIGNATURE, v4.signature());
     v4.add_query(X_AMZ_SECURITY_TOKEN, profile.session_token.to_string());
 
-    let mut request = format!("wss://{}{}?{}", endpoint, v4.uri, v4.canonical_query())
+    let mut request = format!("{}?{}", url, v4.canonical_query())
         .into_client_request()
         .unwrap();
 
     let headers = request.headers_mut();
 
-    headers.insert(HOST, host.parse().unwrap());
+    headers.insert(HOST, options.host().parse().unwrap());
 
     request
 }

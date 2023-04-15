@@ -4,7 +4,7 @@ use crate::{
     signature::{mqtt_over_websockets_request, sign_headers, V4SigOptions},
     types::{AWSCurlError, AWSIotResult, AWSProfile, Body, Method},
 };
-use tungstenite::handshake::client::Request;
+use tungstenite::{handshake::client::Request, connect};
 
 pub struct AWSCurl {
     profile: AWSProfile,
@@ -84,18 +84,18 @@ impl AWSCurl {
         mqtt_over_websockets_request(&self.profile, &endpoint)
     }
 
-    // fn publish_mqtt_over_wss(
-    //     &self,
-    //     endpoint: String,
-    //     _topic: &str,
-    //     _value: Vec<u8>,
-    // ) -> AWSIotResult<()> {
-    //     let request = self.mqtt_over_ws_request(&endpoint);
-    //     let (mut socket, response) = connect(request)
-    //         .map_err(|x| AWSIotError::new(format!("{:?}\n{}", x, x.to_string())))?;
-    //     /*
-    //     TODO: implement sending message
-    //     */
-    //     Ok(())
-    // }
+    pub fn publish_mqtt_over_wss(
+        &self,
+        endpoint: String,
+        _topic: &str,
+        _value: Vec<u8>,
+    ) -> AWSIotResult<()> {
+        let request = self.mqtt_over_ws_request(&endpoint);
+        let (mut socket, response) = connect(request)
+            .map_err(|x| AWSCurlError::new(format!("{:?}\n{}", x, x.to_string())))?;
+        /*
+        TODO: implement sending message
+        */
+        Ok(())
+    }
 }
