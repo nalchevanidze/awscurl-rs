@@ -166,7 +166,7 @@ pub fn sign_headers(
 ) {
     let timestamp = &Timestamp::new();
 
-    headers.insert("host".to_string(), url.host_str().unwrap().to_owned());
+    headers.insert(HOST.to_string(), url.host_str().unwrap().to_owned());
 
     let v4 = V4SigBuilder {
         uri: url.path().into(),
